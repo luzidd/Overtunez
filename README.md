@@ -19,3 +19,9 @@ Written in Rust for performance and correctness.
 - CLAP
 - VST3
 - Standalone
+
+## Project Structure
+
+- `rust/`: source code for the engine, plugins and standalone synth
+- `docs/`: documentation and design notes
+- `math/`: mathematical foundations and utilities
