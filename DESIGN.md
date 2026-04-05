@@ -21,7 +21,7 @@ The modular signal chain lets users create multiple additive engines, choose and
   - Waveshaping / Saturation
 - Mixer
 
-## Components
+## Modules
 
 ### Additive Engines
 

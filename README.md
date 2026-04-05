@@ -12,6 +12,7 @@ Written in Rust for performance and correctness.
   - Frequency
 - Built-in effects
 - Multiple engines
+- maybe: modular signal chain
 
 ## Formats
 
