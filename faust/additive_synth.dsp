@@ -28,13 +28,23 @@ decay_time = hslider("decay", 1.0, 0.1, 10.0, 0.1);
 // Harmonic 1: release = 1.0s, Harmonic 2: 0.5s, ..., Harmonic 128: 0.0078s
 harmonic_env(n) = en.ar(0.001, decay_time / (n + 1), gate);
 
+// Rising-edge trigger: fires on the sample gate goes from 0 → 1
+trig = gate > gate';
+
+// Phase-resetting oscillator using wavetable lookup (same table as os.osc).
+// phase accumulates in [0,1), zeroed on each trigger.
+// rdtable replaces per-sample sinf() calls with a cheap table lookup.
+TSIZE = 1 << 16;
+phase(f) = (+(f / ma.SR) : ma.frac) ~ *(1 - trig);
+osc_r(f) = rdtable(TSIZE, os.sinwaveform(TSIZE), int(phase(f) * float(TSIZE)));
+
 // Each harmonic: sine at (n+1)× freq, scaled by 1/(n+1), with its own decay
-harmonic(n) = os.osc(freq * (n + 1)) * (1.0 / (n + 1)) * harmonic_env(n);
+harmonic(n) = osc_r(freq * (n + 1)) * (1.0 / (n + 1)) * harmonic_env(n);
 
 additive = sum(n, N_HARMONICS, harmonic(n));
 
-// Normalize by harmonic series sum
-normalize = 1.0 / sum(n, N_HARMONICS, 1.0 / (n + 1));
+// Precomputed: 1 / sum(k=1..128, 1/k) = 1 / 5.4331...
+normalize = 0.18403;
 
 // Independent global damping envelope — controls how long the full signal sustains
 master_decay = hslider("master_decay", 2.0, 0.1, 20.0, 0.1);
