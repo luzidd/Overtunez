@@ -1,0 +1,44 @@
+import("stdfaust.lib");
+
+// --- Additive Synthesis with Per-Harmonic Decay ---
+// Each harmonic has its own exponential decay envelope.
+// Higher harmonics decay faster (proportional to harmonic index),
+// so the timbre starts bright and becomes darker over time — like a plucked string.
+//
+// At the moment of the pluck (gate on):
+//   All 128 harmonics sound → bright, full sawtooth-like spectrum
+// After release:
+//   Harmonic 128 dies almost instantly
+//   Harmonic 64 dies in ~twice that time
+//   ...
+//   Harmonic 1 (fundamental) rings the longest
+// Result: the sound naturally evolves from bright → dark → silence
+
+N_HARMONICS = 128;
+
+freq = hslider("freq", 55, 50, 2000, 0.1) : si.smoo;
+gain = hslider("gain", 0.5, 0, 1, 0.01) : si.smoo;
+gate = button("gate");
+
+// Base decay time — harmonic 1 decays over this many seconds.
+// Higher harmonics decay n× faster.
+decay_time = hslider("decay", 1.0, 0.1, 10.0, 0.1);
+
+// Per-harmonic envelope: attack/release envelope where release = decay_time / n
+// Harmonic 1: release = 1.0s, Harmonic 2: 0.5s, ..., Harmonic 128: 0.0078s
+harmonic_env(n) = en.ar(0.001, decay_time / (n + 1), gate);
+
+// Each harmonic: sine at (n+1)× freq, scaled by 1/(n+1), with its own decay
+harmonic(n) = os.osc(freq * (n + 1)) * (1.0 / (n + 1)) * harmonic_env(n);
+
+additive = sum(n, N_HARMONICS, harmonic(n));
+
+// Normalize by harmonic series sum
+normalize = 1.0 / sum(n, N_HARMONICS, 1.0 / (n + 1));
+
+// Independent global damping envelope — controls how long the full signal sustains
+master_decay = hslider("master_decay", 2.0, 0.1, 20.0, 0.1);
+master_env = en.ar(0.001, master_decay, gate);
+
+// Wrap the entire signal in the master envelope
+process = (additive * normalize * gain * master_env) <: (_, _);
