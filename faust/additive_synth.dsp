@@ -14,19 +14,19 @@ import("stdfaust.lib");
 //   Harmonic 1 (fundamental) rings the longest
 // Result: the sound naturally evolves from bright → dark → silence
 
-N_HARMONICS = 128;
+N_HARMONICS = 192;
 
 freq = hslider("freq", 55, 50, 2000, 0.1) : si.smoo;
-gain = hslider("gain", 0.5, 0, 1, 0.01) : si.smoo;
+gain = hslider("gain", 0.8, 0, 1, 0.01) : si.smoo;
 gate = button("gate");
 
 // Base decay time — harmonic 1 decays over this many seconds.
 // Higher harmonics decay n× faster.
-decay_time = hslider("decay", 1.0, 0.1, 10.0, 0.1);
+decay_time = hslider("decay", 2.0, 0.1, 10.0, 0.1);
 
 // Per-harmonic envelope: attack/release envelope where release = decay_time / n
 // Harmonic 1: release = 1.0s, Harmonic 2: 0.5s, ..., Harmonic 128: 0.0078s
-harmonic_env(n) = en.ar(0.001, decay_time / (n + 1), gate);
+harmonic_env(n) = en.ar(0.0, decay_time / (n + 1), gate);
 
 // Rising-edge trigger: fires on the sample gate goes from 0 → 1
 trig = gate > gate';
@@ -36,7 +36,15 @@ trig = gate > gate';
 // rdtable replaces per-sample sinf() calls with a cheap table lookup.
 TSIZE = 1 << 16;
 phase(f) = (+(f / ma.SR) : ma.frac) ~ *(1 - trig);
-osc_r(f) = rdtable(TSIZE, os.sinwaveform(TSIZE), int(phase(f) * float(TSIZE)));
+osc_r(f) = s0 + (s1 - s0) * frac
+  with {
+    idx  = phase(f) * float(TSIZE);
+    i0   = int(idx);
+    i1   = (i0 + 1) % TSIZE;
+    frac = idx - float(i0);
+    s0   = rdtable(TSIZE, os.sinwaveform(TSIZE), i0);
+    s1   = rdtable(TSIZE, os.sinwaveform(TSIZE), i1);
+  };
 
 // Each harmonic: sine at (n+1)× freq, scaled by 1/(n+1), with its own decay
 harmonic(n) = osc_r(freq * (n + 1)) * (1.0 / (n + 1)) * harmonic_env(n);
@@ -47,8 +55,8 @@ additive = sum(n, N_HARMONICS, harmonic(n));
 normalize = 0.18403;
 
 // Independent global damping envelope — controls how long the full signal sustains
-master_decay = hslider("master_decay", 2.0, 0.1, 20.0, 0.1);
-master_env = en.ar(0.001, master_decay, gate);
+master_decay = hslider("master_decay", 1.0, 0.1, 20.0, 0.1);
+master_env = en.ar(0.0001, master_decay, gate);
 
 // Wrap the entire signal in the master envelope
 process = (additive * normalize * gain * master_env) <: (_, _);
